@@ -94,6 +94,7 @@ async function main() {
 
     let model = mat4.create();
     /* 회전하면 너무 어지러워서 회전 부분만 주석처리
+    */
     let xRotation = mat4.create();
     let yRotation = mat4.create();
     let translation = mat4.create();
@@ -106,7 +107,7 @@ async function main() {
     // 이제 좌우 이동을 위해, translation 행렬을 만들어 model 행렬에 곱해줍니다.
     mat4.translate(translation,translation, [translationOffset, 0.0, 0.0]);
     mat4.multiply(model, translation, model);
-    */
+    /**/
 
     shader.SetUniformMat4f(gl, "u_model", model);
 
