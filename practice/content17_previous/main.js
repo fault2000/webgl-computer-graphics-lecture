@@ -21,13 +21,13 @@ var lightSpecularVertexShader = `#version 300 es
   uniform mat4 u_projection; 
   uniform mat4 u_view; //카메라를 통해 반환된 View행렬
   uniform mat4 u_model; //모델의 world공간 위치와 자세
-  uniform vec3 u_eyePosition; // <-- 카메라 위치 추가
+  //uniform vec3 u_eyePosition; // <-- 카메라 위치 추가
 
   out vec2 v_texcoord;
   out vec3 v_normal; 
   out vec3 v_worldPosition; //<--specular 계산에서는 각 프래그먼트를 기준으로 한 v벡터가 필요합니다.
                             //   따라서 프래그먼트의 월드 공간 좌표를 계산해서 넘겨줘야 합니다.
-  out vec3 v_vector;
+  //out vec3 v_vector;
 
   void main() {
     gl_Position = u_projection * u_view * u_model * vec4(a_position,1.0); 
@@ -38,7 +38,7 @@ var lightSpecularVertexShader = `#version 300 es
     v_worldPosition = (u_model * vec4(a_position, 1.0)).xyz; //<-- 모델 행렬만 곱하면 월드공간 좌표가 얻어집니다.
 
     // v_vector 계산: 월드 공간에서의 카메라 위치 - 월드 공간에서의 정점 위치
-    v_vector = u_eyePosition - v_worldPosition;
+    //v_vector = u_eyePosition - v_worldPosition;
   }
 `;
 
@@ -88,8 +88,8 @@ var lightSpecularFragmentShader = `#version 300 es
     vec3 lightDiffuse = u_directionalLight.lightColor * u_directionalLight.diffuseIntensity * diffuseFactor;
 
     //--Specular
-    //vec3 vVec = normalize(u_eyePosition - v_worldPosition); // v벡터 계산
-    vec3 vVec = normalize(v_vector); // 보간된 v_vector를 정규화
+    vec3 vVec = normalize(u_eyePosition - v_worldPosition); // v벡터 계산
+    //vec3 vVec = normalize(v_vector); // 보간된 v_vector를 정규화
     vec3 rVec = 2.0 * normal * dot(normal, lightDir) - lightDir;
     float cosAngleRV = max(dot(rVec,vVec),0.0);
     vec3 lightSpecular = pow(cosAngleRV, u_material.shininess) * u_directionalLight.lightColor * u_material.specularIntensity;
