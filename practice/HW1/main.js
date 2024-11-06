@@ -10,21 +10,39 @@ import IndexBuffer from '../_classes/IndexBuffer.js';
 
 const {mat2, mat3, mat4, vec2, vec3, vec4} = glMatrix;
 
-var pyramidPositions = [
-    0.0, 1.0, 0.0, 1.0, 0.0, 0.0,//0번 vertex
-    1.0, 0.0, 0.0, 0.0, 1.0, 0.0,//1번 vertex
-    0.0, 0.0, 1.0, 0.0, 0.0, 1.0,//2번 vertex
-    -1.0, 0.0, 0.0, 1.0, 1.0, 0.0,//3번 vertex
-    0.0, 0.0, -1.0, 0.0, 1.0, 1.0,//4번 vertex
-];
-var pytamidIndices = [
-    0, 1, 2,
-    0, 2, 3,
-    0, 3, 4,
-    0, 4, 1,
-    1, 2, 4,
-    2, 3, 4,
-];
+var pyramidVertexShaderSource = 
+`#version 300 es
+
+layout(location=0) in vec3 a_position; 
+layout(location=1) in vec3 a_color; 
+
+//--Uniforms
+uniform mat4 u_projection;
+uniform mat4 u_view;
+uniform mat4 u_model;
+
+//--Varyings
+out vec3 v_color;
+
+void main() {
+  gl_Position = u_projection * u_view * u_model * vec4(a_position, 1.0);
+  v_color = a_color;
+}
+`;
+
+var pyramidFragmentShaderSource = 
+`#version 300 es
+
+precision highp float;
+
+layout(location=0) out vec4 outColor;
+
+in vec3 v_color;
+
+void main() {
+  outColor = vec4(v_color, 1.0);
+}
+`;
 
 async function main() {
   // Get A WebGL context
@@ -34,7 +52,29 @@ async function main() {
     return;
   }
   
-  //---Camera(view) Initialize
+  // 피라미드 정점 데이터
+  var pyramidVertices = [
+    0.0, 1.0, 0.0, 1.0, 0.0, 0.0,//0번 vertex
+    1.0, 0.0, 0.0, 0.0, 1.0, 0.0,//1번 vertex
+    0.0, 0.0, 1.0, 0.0, 0.0, 1.0,//2번 vertex
+    -1.0, 0.0, 0.0, 1.0, 1.0, 0.0,//3번 vertex
+    0.0, 0.0, -1.0, 0.0, 1.0, 1.0,//4번 vertex
+  ];
+  // 피라미드 인덱스 데이터
+  var pyramidIndices = [
+    2, 1, 0,
+    3, 2, 0,
+    4, 3, 0,
+    1, 4, 0,
+    4, 2, 1,
+    4, 3, 2,
+  ];
+
+  let pyramidVA = new VertexArray(gl); 
+  let pyramidVB = new VertexBuffer(gl,pyramidVertices);
+  pyramidVA.AddBuffer(gl, pyramidVB, [3, 3], [false, false]);
+  let pyramidIB = new IndexBuffer(gl, pyramidIndices, 18);
+
   let eye = [0.0, 1.0, 4.0];
   let up = [0.0, 1.0, 0.0];
   let yaw = -90.0;
@@ -42,77 +82,62 @@ async function main() {
   let movespeed = 0.05;
   let turnspeed = 0.5;
   let mainCamera = new Camera(eye,up,yaw,pitch,movespeed,turnspeed);
-  
-  //---Projection Initialize
+
+  //orthographc 대신 perspective projection matrix 사용
   let fovRadian = 90.0 * Math.PI / 180;
   let aspect = gl.canvas.clientWidth/gl.canvas.clientHeight;
   let proj = mat4.create();
   mat4.perspective(proj, fovRadian, aspect, 0.1, 100.0);
 
-  //---Shader Initialize
-  let shader = new Shader(gl,textureVertexShader,textureFragmentShader);
+  let shader = new Shader(gl, pyramidVertexShaderSource, pyramidFragmentShaderSource);
   shader.Bind(gl);
   shader.SetUniformMat4f(gl, "u_projection", proj);
+  pyramidVA.Unbind(gl); 
+  pyramidVB.Unbind(gl);
+  pyramidIB.Unbind(gl);
   shader.Unbind(gl);
 
-  //---Renderer Initialize
   let renderer = new Renderer();
-  gl.clearColor(1.0, 1.0, 1.0, 1.0);
-  
-  let rotationAngle = 0;
-
-  requestAnimationFrame(drawScene);
-  
   // 화면 검은색 설정 및 깊이 테스트 활성화
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
-  gl.enable(gl.DEPTH_TEST);
   // back face culling 활성화
   gl.enable(gl.CULL_FACE);
+  gl.enable(gl.DEPTH_TEST);
+
+  requestAnimationFrame(drawScene);
+
+  //---UI 셋업
+  var rotation = 0;
+  //슬라이더가 움직일 때마다, slide에 할당할 콜백함수가 호출됨
+  webglLessonsUI.setupSlider("#PyramidRotationY", {slide: updateRotation, min: 0, max: 360, step: 1});
+
+  //slide 콜백함수
+  function updateRotation(event, ui)
+  {
+    rotation = ui.value;
+	  requestAnimationFrame(drawScene);
+  }
 
   function drawScene()
   {
-    //화면 크기 재조정
   	webglUtils.resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    
+
     renderer.Clear(gl);
 
     shader.Bind(gl); //Uniform 설정에 필요하기 때문에 바인딩
     {
-      //---카메라 설정(현재는 모든 모델에 대해 동일한 뷰행렬 사용)
       let view = mainCamera.CalculateViewMatrix();
-      shader.SetUniformMat4f(gl, "u_view", view);
-      
-      //---육면체 그리기
-      rotationAngle += Math.PI * 1 / 180;
+      shader.SetUniformMat4f(gl, "u_view", view); 
 
       let model = mat4.create();
-      mat4.fromXRotation(model, rotationAngle);
+      mat4.rotateY(model, model, rotation * Math.PI / 180); // Y축 회전 적용
       shader.SetUniformMat4f(gl, "u_model", model);
 
-      //텍스처를 바인딩하고, 셰이더의 sampler2D u_texture에 해당 텍스처를 사용합니다.
-	    //0번 텍스처 유닛에 텍스처를 바인딩하고, 셰이더에는 0번 유닛으로부터 텍스처 값을 얻어오게 합니다.
-	    internetTexture.Bind(gl,0);
-      shader.SetUniform1i(gl, "u_mainTexture", 0);
-
-      cube.RenderModel(gl, shader);
-      
-      //---주전자 그리기
-      model = mat4.create();
-      mat4.translate(model, model, [3, 0, 0]);
-      mat4.scale(model, model, [0.1, 0.1, 0.1]);
-      shader.SetUniformMat4f(gl, "u_model", model);
-
-      //주전자에는 checker texture를 사용해 보겠습니다.
-      //이번에는 1번 텍스처 유닛에 바인딩하고 셰이더에는 1번 유닛을 사용하도록 알려줍니다.
-      checkerTexture.Bind(gl,0);
-      shader.SetUniform1i(gl, "u_mainTexture", 0);
-      
-      teapot.RenderModel(gl, shader);
+      renderer.Draw(gl, pyramidVA, pyramidIB, shader);
     }
-    
-    shader.Unbind(gl);
 
+    shader.Unbind(gl);
     requestAnimationFrame(drawScene);
   }
 
@@ -122,13 +147,7 @@ async function main() {
   //키보드 이벤트 핸들러 함수
   function KeyboardEventHandler(e)
   {
-    mainCamera.KeyControl(e); 
-  }
-
-  //마우스 이벤트 핸들러 함수
-  function MouseMoveEventHandler(e)
-  {
-    mainCamera.MouseControl(e); 
+    mainCamera.KeyControl(e); // 카메라 클래스의 KeyControl로 이벤트 정보 전달
   }
 }
 
