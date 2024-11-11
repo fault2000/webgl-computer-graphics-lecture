@@ -131,7 +131,6 @@ async function main() {
       shader.SetUniformMat4f(gl, "u_view", view); 
 
       let model = mat4.create();
-      mat4.rotateY(model, model, rotation * Math.PI / 180); // Y축 회전 적용
       shader.SetUniformMat4f(gl, "u_model", model);
 
       renderer.Draw(gl, pyramidVA, pyramidIB, shader);
